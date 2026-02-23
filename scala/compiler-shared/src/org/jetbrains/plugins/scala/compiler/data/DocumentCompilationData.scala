@@ -1,5 +1,7 @@
 package org.jetbrains.plugins.scala.compiler.data
 
+import org.jetbrains.jps.incremental.scala.remote.PathTranslator
+
 import java.nio.file.Path
 
 final case class DocumentCompilationData(
@@ -14,10 +16,13 @@ object DocumentCompilationData {
 
   import Extractors.{StringToPath, StringToPaths, StringToSequence}
 
-  def serialize(data: DocumentCompilationData): Seq[String] = {
+  def serialize(data: DocumentCompilationData, translator: PathTranslator): Seq[String] = {
     val DocumentCompilationData(sourcePath, sourceContent, output, classpath, scalacOptions) = data
 
-    import serialization.SerializationUtils.{pathToString, pathsToString, sequenceToString}
+    import serialization.SerializationUtils.sequenceToString
+
+    val pathToString: Path => String = translator.translate
+    val pathsToString: Seq[Path] => String = paths => sequenceToString(paths.map(pathToString))
 
     Seq(
       pathToString(sourcePath),

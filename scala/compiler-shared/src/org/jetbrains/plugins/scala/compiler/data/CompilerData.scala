@@ -1,6 +1,7 @@
 package org.jetbrains.plugins.scala.compiler.data
 
 import org.jetbrains.jps.incremental.scala.Extractor
+import org.jetbrains.jps.incremental.scala.remote.PathTranslator
 import org.jetbrains.plugins.scala.compiler.data.Extractors.{StringToPath, StringToPaths}
 
 import java.nio.file.Path
@@ -10,9 +11,12 @@ case class CompilerData(compilerJars: Option[CompilerJars],
                         incrementalType: IncrementalityType)
 
 object CompilerData {
-  import serialization.SerializationUtils.{optionToString, pathToString, pathsToString}
+  import serialization.SerializationUtils.{optionToString, sequenceToString}
 
-  def serialize(data: CompilerData): Seq[String] = {
+  def serialize(data: CompilerData, translator: PathTranslator): Seq[String] = {
+    val pathToString: Path => String = translator.translate
+    val pathsToString: Seq[Path] => String = paths => sequenceToString(paths.map(pathToString))
+
     val compilerJarPaths = data.compilerJars.map(jars => pathsToString(jars.allJars))
     val customCompilerBridgeJarPath = data.compilerJars.flatMap(_.customCompilerBridgeJar.map(pathToString))
     val replClasspath = data.compilerJars.map(jars => pathsToString(jars.replClasspath))

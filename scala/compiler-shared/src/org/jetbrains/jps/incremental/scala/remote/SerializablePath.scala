@@ -19,6 +19,8 @@ final class SerializablePath private (private val pathAsString: String) extends 
   override def toString: String = s"SerializablePath(path = $pathAsString)"
 
   def toPath: Path = Paths.get(pathAsString)
+
+  def unsafePathAsString: String = pathAsString
 }
 
 object SerializablePath {

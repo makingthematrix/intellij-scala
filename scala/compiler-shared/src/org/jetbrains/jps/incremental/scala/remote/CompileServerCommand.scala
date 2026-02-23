@@ -1,11 +1,13 @@
 package org.jetbrains.jps.incremental.scala.remote
 
 import org.jetbrains.jps.incremental.scala.ScalaJpsProjectMetadata
-import org.jetbrains.plugins.scala.compiler.data.serialization.SerializationUtils
 import org.jetbrains.plugins.scala.compiler.data.{Arguments, ComputeStampsArguments, DocumentCompilationArguments, ExpressionEvaluationArguments}
 
+import java.nio.file.Path
+import scala.annotation.unused
+
 sealed trait CompileServerCommand {
-  def asArgs: Seq[String]
+  def asArgs(translator: PathTranslator): Seq[String]
 
   def id: String
 
@@ -19,13 +21,13 @@ object CompileServerCommand {
 
     override def id: String = CommandIds.Compile
 
-    override def asArgs: Seq[String] = arguments.asStrings
+    override def asArgs(translator: PathTranslator): Seq[String] = arguments.asStrings(translator)
 
     override def isCompileCommand: Boolean = true
   }
 
   case class ComputeStamps(arguments: ComputeStampsArguments) extends CompileServerCommand {
-    override def asArgs: Seq[String] = arguments.asStrings
+    override def asArgs(translator: PathTranslator): Seq[String] = arguments.asStrings(translator)
 
     override def id: String = CommandIds.ComputeStamps
 
@@ -36,9 +38,9 @@ object CompileServerCommand {
    * @param externalProjectConfig Some(path) in case build system supports storing project configuration outside `.idea` folder
    */
   case class CompileJps(
-    projectPath: String,
-    globalOptionsPath: String,
-    dataStorageRootPath: String,
+    projectPath: Path,
+    globalOptionsPath: Path,
+    dataStorageRootPath: Path,
     moduleNames: Seq[String],
     sourceScope: SourceScope,
     projectMetadata: ScalaJpsProjectMetadata,
@@ -47,20 +49,25 @@ object CompileServerCommand {
 
     override def id: String = CommandIds.CompileJps
 
-    override def asArgs: Seq[String] = Seq(
-      projectPath,
-      globalOptionsPath,
-      dataStorageRootPath,
-      SerializationUtils.sequenceToString(moduleNames),
-      sourceScope.toString,
-      projectMetadata.asCompactJsonString
-    ) ++ externalProjectConfig
+    override def asArgs(translator: PathTranslator): Seq[String] = {
+      import org.jetbrains.plugins.scala.compiler.data.serialization.SerializationUtils.sequenceToString
+      val pathToString: Path => String = translator.translate
+
+      Seq(
+        pathToString(projectPath),
+        pathToString(globalOptionsPath),
+        pathToString(dataStorageRootPath),
+        sequenceToString(moduleNames),
+        sourceScope.toString,
+        projectMetadata.asCompactJsonString
+      ) ++ externalProjectConfig
+    }
 
     override def isCompileCommand: Boolean = true
   }
 
   case class CompileDocument(arguments: DocumentCompilationArguments) extends CompileServerCommand {
-    override def asArgs: Seq[String] = DocumentCompilationArguments.serialize(arguments)
+    override def asArgs(translator: PathTranslator): Seq[String] = DocumentCompilationArguments.serialize(arguments, translator)
 
     override def id: String = CommandIds.CompileDocument
 
@@ -68,7 +75,7 @@ object CompileServerCommand {
   }
 
   case class EvaluateExpression(args: ExpressionEvaluationArguments) extends CompileServerCommand {
-    override def asArgs: Seq[String] = args.asStrings
+    override def asArgs(translator: PathTranslator): Seq[String] = args.asStrings(translator)
 
     override def id: String = CommandIds.EvaluateExpression
 
@@ -77,7 +84,7 @@ object CompileServerCommand {
 
   case object GetMetrics extends CompileServerCommand {
 
-    override def asArgs: Seq[String] = Seq.empty
+    override def asArgs(@unused translator: PathTranslator): Seq[String] = Seq.empty
 
     override def id: String = CommandIds.GetMetrics
 
